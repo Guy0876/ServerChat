@@ -1,38 +1,41 @@
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.Scanner;
-public class MainServerThread extends Thread{
 
-    private ServerSocket socket;
+public class MainServerThread extends Thread {
+    private final ServerSocket serverSocket;
+    private final ArrayList<ChatThread> clients = new ArrayList<>();
 
-    public MainServerThread(ServerSocket socket) {
-        this.socket = socket;
+    public MainServerThread(ServerSocket serverSocket) {
+        this.serverSocket = serverSocket;
     }
 
     @Override
-    public void run(){
-        super.run();
+    public void run() {
+        System.out.println("Server is running...");
         try {
-            while(true) {
-                Socket clientSocket = socket.accept();
-                BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-                PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true);
-                String input = reader.readLine();
-                if (input.equals("EXIT")) {
-                    System.out.println("Exiting");
-                    break;
-                }
-                System.out.println("received from client " + input);
-                writer.println("From Server: " + input);
+            while (true) {
+                Socket clientSocket = serverSocket.accept();
+                System.out.println("New client connected ");
+                ChatThread cth = new ChatThread(clientSocket, this);
+                clients.add(cth);
+                cth.start();
             }
-            socket.close();
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            System.out.println("Error in server: " + e.getMessage());
         }
+    }
+
+    public synchronized void broadcastMessage(String message, ChatThread sender) {
+        for (ChatThread client : clients) {
+            if (client != sender) {
+                client.sendMessage(message);
+            }
+        }
+    }
+
+    public synchronized void removeClient(ChatThread cth) {
+        clients.remove(cth);
     }
 }
