@@ -1,38 +1,42 @@
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
+import java.io.*;
 import java.net.Socket;
-import java.sql.SQLOutput;
-import java.util.Scanner;
-public class ChatThread extends Thread{
 
-    private Socket clientSocket;
+public class ChatThread extends Thread {
+    private final Socket socket;
+    private final MainServerThread server;
+    private PrintWriter writer;
 
-    public ChatThread(Socket clientSocket) {
-        this.clientSocket = clientSocket;
+    public ChatThread(Socket socket, MainServerThread server) {
+        this.socket = socket;
+        this.server = server;
     }
 
     @Override
-    public void run(){
-        super.run();
-        Scanner sc = new Scanner(System.in);
-        try {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-            PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true);
-            String input;
-            while ((input = reader.readLine()) != null) {
-                if ("EXIT".equalsIgnoreCase(input)) {
-                    System.out.println("EXITING");
-                    break;
-                }
-                System.out.println("Received: " + input);
-                writer.println("Echo: " + input);
+    public void run() {
+        try (
+                BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+        ) {
+            writer = new PrintWriter(socket.getOutputStream(), true);
+            String message;
+            while ((message = reader.readLine()) != null) {
+                System.out.println("Received: " + message);
+                server.broadcastMessage(message, this);
             }
-            clientSocket.close();
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            System.out.println("Client disconnected ");
+        } finally {
+            server.removeClient(this);
+            try {
+                socket.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
         }
-        sc.close();
+    }
+
+    public void sendMessage(String message) {
+        if (writer != null) {
+            writer.println(message);
+        }
     }
 }
